@@ -37,46 +37,47 @@ def run_real_memory_test(checkpoint_path: str):
         print("Error: CUDA is not available. Cannot perform real GPU validation.")
         return
     
-    # Pre-flight check for official CROMA module
     repo_path = os.getenv("CROMA_REPO_PATH", "")
     if not repo_path:
         print("Error: CROMA_REPO_PATH environment variable is not set.")
         print("Please clone https://github.com/antofuller/CROMA and set CROMA_REPO_PATH to its location.")
         return
         
-    if repo_path not in sys.path:
-        sys.path.append(repo_path)
-
-    try:
-        # Based on standard CROMA repo structure
-        # Usually from croma import CROMA_base or from models import CROMA_base
-        try:
-            from croma import CROMA_base
-        except ImportError:
-            from models.croma import CROMA_base
-    except ImportError as e:
-        print(f"Error: Cannot import official CROMA modules ({e}).")
-        print(f"Ensure CROMA_REPO_PATH points to the correct directory. Path tried: {repo_path}")
+    use_croma_path = os.path.join(repo_path, "use_croma.py")
+    if not os.path.exists(use_croma_path):
+        print(f"Error: Cannot find use_croma.py at {use_croma_path}")
         return
 
-    print(f"\nAttempting to initialize CROMA_base model...")
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("use_croma", use_croma_path)
+        use_croma = importlib.util.module_from_spec(spec)
+        # Add the repo to sys.path so any internal relative imports in use_croma work
+        if repo_path not in sys.path:
+            sys.path.insert(0, repo_path)
+        spec.loader.exec_module(use_croma)
+        PretrainedCROMA = use_croma.PretrainedCROMA
+    except Exception as e:
+        print(f"Error: Cannot dynamically import PretrainedCROMA from {use_croma_path} ({e}).")
+        import traceback
+        traceback.print_exc()
+        return
+
+    print(f"\nAttempting to initialize PretrainedCROMA model...")
     
     try:
         t0 = time.time()
-        # Initialize model
-        model = CROMA_base(pretrained=False) # We will load state_dict manually if needed
         
-        # Load weights if checkpoint provided
-        if checkpoint_path and os.path.exists(checkpoint_path):
-            print(f"Loading checkpoint from: {checkpoint_path}")
-            state_dict = torch.load(checkpoint_path, map_location='cuda:0')
-            # Handle potential DataParallel or specific checkpoint wrapping
-            if 'model' in state_dict:
-                state_dict = state_dict['model']
-            model.load_state_dict(state_dict, strict=False)
+        # Ensure checkpoint exists
+        if not checkpoint_path or not os.path.exists(checkpoint_path):
+            print(f"Warning: No valid checkpoint found at '{checkpoint_path}'. Initializing model with uninitialized weights for testing.")
+            checkpoint_path = None
         else:
-            print("No valid checkpoint_path provided. Running with uninitialized weights for VRAM test.")
-            
+            print(f"Loading checkpoint from: {checkpoint_path}")
+
+        # Initialize model
+        model = PretrainedCROMA(pretrained_path=checkpoint_path, size='base', modality='both', image_resolution=120)
+        
         model = model.cuda()
         model.eval()
         
@@ -94,8 +95,7 @@ def run_real_memory_test(checkpoint_path: str):
         
         t1 = time.time()
         with torch.no_grad():
-            # forward pass: extracts encodings. Usually returns SAR_encodings, optical_encodings, joint_encodings
-            outputs = model(imgs=dummy_optical, SAR_imgs=dummy_sar)
+            outputs = model(SAR_images=dummy_sar, optical_images=dummy_optical)
         
         infer_time = time.time() - t1
         peak_memory = torch.cuda.max_memory_allocated() / (1024 ** 3)
@@ -104,10 +104,17 @@ def run_real_memory_test(checkpoint_path: str):
         print(f"Peak VRAM used during inference: {peak_memory:.2f} GB")
         print(f"Output type: {type(outputs)}")
         
-        if isinstance(outputs, (list, tuple)):
-            print(f"Output shapes: {[o.shape if hasattr(o, 'shape') else type(o) for o in outputs]}")
-        elif hasattr(outputs, 'shape'):
-            print(f"Output shape: {outputs.shape}")
+        if isinstance(outputs, dict):
+            print(f"Output keys: {list(outputs.keys())}")
+            for k, v in outputs.items():
+                if hasattr(v, 'shape'):
+                    print(f"  {k} shape: {v.shape}")
+                elif isinstance(v, (list, tuple)):
+                    print(f"  {k} shapes: {[o.shape if hasattr(o, 'shape') else type(o) for o in v]}")
+                else:
+                    print(f"  {k} type: {type(v)}")
+        else:
+            print("Output was not a dictionary as expected.")
         
         # Cleanup
         del model
@@ -137,8 +144,7 @@ if __name__ == "__main__":
     if args.mode == "dry-run":
         print("\n[DRY-RUN MODE]")
         print("Skipping actual model loading and inference to keep this CPU machine safe.")
-        print("To perform the actual GPU VRAM test on the RTX 4050 machine, clone the CROMA repo and run:")
-        print("$env:CROMA_REPO_PATH=\"C:\\path\\to\\CROMA\"")
+        print("To perform the actual GPU VRAM test on the RTX 4050 machine, run:")
         print("python backend/scripts/test_croma_preflight.py --mode real-gpu --checkpoint C:\\path\\to\\CROMA_base.pt")
     elif args.mode == "real-gpu":
         print("\n[REAL-GPU MODE]")
