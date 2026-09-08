@@ -69,6 +69,7 @@ def test_analyze_bi_temporal():
     assert data["success"] is True
     assert data["data"]["task"] == "change_analysis"
     assert data["data"]["executionTrace"]["selectedTools"][0]["id"] == "bit_cd"
+    assert data["data"]["confidence"] is None
 
 def test_analyze_optical_sar():
     response = client.post(
@@ -119,3 +120,14 @@ def test_geochat_local_gpu_no_cuda():
         # Since CUDA is not available on this CPU machine, it should gracefully raise RuntimeError
         with pytest.raises(RuntimeError, match="CUDA is not available"):
             adapter.run(query="test", image_path="dummy.png")
+
+def test_bitcd_local_gpu_no_cuda():
+    import os
+    from unittest import mock
+    from app.models.adapters.bit_cd_adapter import BITCDAdapter
+    
+    with mock.patch.dict(os.environ, {"ML_INFERENCE_MODE": "local_gpu"}):
+        adapter = BITCDAdapter()
+        # Since CUDA is not available on this CPU machine, it should gracefully raise RuntimeError
+        with pytest.raises(RuntimeError, match="CUDA is not available"):
+            adapter.run(query="test", image_path="dummy.png", image_b_path="dummy2.png")
