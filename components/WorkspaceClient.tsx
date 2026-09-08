@@ -236,7 +236,7 @@ export default function WorkspaceClient() {
             <h1>Welcome to your <em>mission.</em></h1>
             <p>Ask questions, inspect satellite observations, and turn remote-sensing imagery into clear intelligence.</p>
             <div className="sq-status-line">
-              <span className="online"><i /> SYSTEM {statusText}</span><span>API /api/analyze</span><span>DEMO / MOCK</span>
+              <span className="online"><i /> SYSTEM {statusText}</span><span>API /api/analyze</span><span>{result?.demo ? 'DEMO / MOCK' : 'LIVE PIPELINE'}</span>
             </div>
           </section>
 
@@ -326,16 +326,18 @@ export default function WorkspaceClient() {
                   return <div className={`sq-trace-step ${state}`} key={item}><span>0{index + 1}</span><i /><strong>{item}</strong>{index < stages.length - 1 && <b />}</div>;
                 })}
               </div>
-              <p className="sq-demo-note">Confidence and evidence in the current build are illustrative DEMO values. Real GeoChat / BIT-CD / CROMA inference will replace the mock response when the ML milestone is integrated.</p>
+              {result?.demo && (
+                <p className="sq-demo-note">Confidence and evidence in the current build are illustrative DEMO values. Real GeoChat / BIT-CD / CROMA inference will replace the mock response when the ML milestone is integrated.</p>
+              )}
             </section>
           )}
 
           {showFindings && (
             <section className="sq-drawer">
-              <div className="sq-drawer-head"><div><span>SAT-AI FINDINGS</span><small>RESULT PAYLOAD</small></div><span className="sq-drawer-state">{result ? 'MOCK / DEMO' : 'NO RESULT'}</span></div>
+              <div className="sq-drawer-head"><div><span>SAT-AI FINDINGS</span><small>RESULT PAYLOAD</small></div><span className="sq-drawer-state">{result ? (result.demo ? 'MOCK / DEMO' : 'LIVE INFERENCE') : 'NO RESULT'}</span></div>
               {result ? (
                 <div className="sq-findings">
-                  <div className="sq-answer"><span>ANSWER · {result.status.toUpperCase()}</span><p>{result.answer}</p><div className="sq-readouts"><div><small>ANALYSIS ID</small><strong>{result.analysisId}</strong></div><div><small>TASK</small><strong>{result.task}</strong></div><div><small>CONFIDENCE</small><strong>{result.confidence === null ? '—' : `${result.confidence}%`} <em>DEMO</em></strong></div></div></div>
+                  <div className="sq-answer"><span>ANSWER · {result.status.toUpperCase()}</span><p>{result.answer}</p><div className="sq-readouts"><div><small>ANALYSIS ID</small><strong>{result.analysisId}</strong></div><div><small>TASK</small><strong>{result.task}</strong></div><div><small>CONFIDENCE</small><strong>{result.confidence === null ? '—' : `${result.confidence}%`} {result.demo && <em>DEMO</em>}</strong></div></div></div>
                   <div className="sq-evidence"><span>EVIDENCE · {result.evidence.length} ITEMS</span>{result.evidence.map((item) => <div key={item.id}><b>⌖</b><div><strong>{item.label}</strong><p>{item.description}</p></div><em>{item.source}</em></div>)}</div>
                 </div>
               ) : <div className="sq-empty-findings"><span>+</span><div><strong>AWAITING OBSERVATION</strong><p>Run an analysis to populate the answer, evidence and execution summary.</p></div></div>}

@@ -4,3 +4,8 @@ out/
 .env*
 !.env.example
 npm-debug.log*
+__pycache__/
+*.tsbuildinfo
+.claude/
+.cursor/
+.devin/

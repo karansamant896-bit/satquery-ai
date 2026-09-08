@@ -1,0 +1,6 @@
+torch==2.1.2+cu121
+torchvision==0.16.2+cu121
+transformers==4.38.0
+accelerate==0.27.2
+bitsandbytes==0.42.0
+Pillow
