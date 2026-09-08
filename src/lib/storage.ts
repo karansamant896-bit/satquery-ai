@@ -1,17 +1,29 @@
 import 'server-only';
 import { createClient } from '@supabase/supabase-js';
 
-// Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to be set in environment variables
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Lazy initialization for Supabase client to avoid top-level crashes when importing in test/build environments
+let _supabaseAdmin: any = null;
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables');
+export function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables');
+    }
+
+    _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+  }
+  return _supabaseAdmin;
 }
 
-// Create a single Supabase client using the service role key to bypass RLS and access private buckets.
-// This MUST NOT be exposed to the frontend.
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+// Proxy export preserving `supabaseAdmin.storage...` API while deferring instantiation
+export const supabaseAdmin = new Proxy({} as any, {
+  get(_target, prop) {
+    return getSupabaseAdmin()[prop];
+  }
+});
 
 export const BUCKETS = {
   IMAGES: 'satquery-images',
