@@ -1,5 +1,7 @@
 import time
 import os
+import tempfile
+import shutil
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status
 from typing import Optional, List
 
@@ -36,6 +38,9 @@ async def analyze_endpoint(
     def log_stage(name: str):
         stages.append(ExecutionStage(stage=name, status="completed", timestamp=time.time()))
 
+    temp_a_path = None
+    temp_b_path = None
+
     try:
         start_time = time.time()
         log_stage("request_received")
@@ -58,11 +63,23 @@ async def analyze_endpoint(
         
         log_stage("input_validated")
 
-        # 2. Classify task
+        # 2. Save file locally for ML inference
+        ext_a = os.path.splitext(image_a.filename)[1].lower()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext_a) as tmp_a:
+            shutil.copyfileobj(image_a.file, tmp_a)
+            temp_a_path = tmp_a.name
+            
+        if image_b:
+            ext_b = os.path.splitext(image_b.filename)[1].lower()
+            with tempfile.NamedTemporaryFile(delete=False, suffix=ext_b) as tmp_b:
+                shutil.copyfileobj(image_b.file, tmp_b)
+                temp_b_path = tmp_b.name
+
+        # 3. Classify task
         task = TaskRouter.classify_task(query, analysis_mode)
         log_stage("task_selected")
 
-        # 3. Select model
+        # 4. Select model
         try:
             model_id = TaskRouter.select_model(task)
             model = registry.get_model(model_id)
@@ -70,11 +87,15 @@ async def analyze_endpoint(
         except ValueError as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-        # 4. Execute inference
-        inference_result = model.run(query=query)
-        log_stage("inference_mocked")
+        # 5. Execute inference
+        inference_result = model.run(
+            query=query, 
+            image_path=temp_a_path,
+            image_b_path=temp_b_path,
+            log_cb=log_stage
+        )
 
-        # 5. Integrate result
+        # 6. Integrate result
         log_stage("result_generated")
         result_data = ResultIntegrator.integrate(
             query=query,
@@ -95,4 +116,11 @@ async def analyze_endpoint(
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Cleanup temp files
+        if temp_a_path and os.path.exists(temp_a_path):
+            os.remove(temp_a_path)
+        if temp_b_path and os.path.exists(temp_b_path):
+            os.remove(temp_b_path)
+
 

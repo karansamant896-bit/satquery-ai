@@ -29,7 +29,7 @@ class AnalysisResultData(BaseModel):
     status: str
     task: str
     answer: str
-    confidence: float
+    confidence: Optional[float] = None
     evidence: List[EvidenceItem]
     executionTrace: ExecutionTrace
     reportUrl: Optional[str] = None

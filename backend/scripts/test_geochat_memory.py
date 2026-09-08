@@ -28,7 +28,6 @@ def get_sys_info():
 def run_real_memory_test():
     try:
         import torch
-        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
     except ImportError as e:
         print(f"Error: Required dependency missing ({e}).")
         print("Please run: pip install -r requirements-ml.txt")
@@ -38,26 +37,35 @@ def run_real_memory_test():
         print("Error: CUDA is not available. Cannot perform real GPU validation.")
         return
     
-    model_id = "MBZUAI/geochat-7B"
-    
-    print(f"\nAttempting to load {model_id} in 4-bit mode...")
-    print("This will download the weights if not cached and consume VRAM.")
-    
-    quantization_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_use_double_quant=True,
-        bnb_4bit_quant_type="nf4"
-    )
+    # Pre-flight check for official geochat module
+    repo_path = os.getenv("GEOCHAT_REPO_PATH", "")
+    if repo_path and repo_path not in sys.path:
+        sys.path.append(repo_path)
 
     try:
-        # Load the model
-        tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
-        model = AutoModelForCausalLM.from_pretrained(
-            model_id,
-            quantization_config=quantization_config,
-            device_map="auto",
-            trust_remote_code=True
+        from geochat.model.builder import load_pretrained_model
+        from geochat.utils import disable_torch_init
+    except ImportError as e:
+        print(f"Error: Cannot import official GeoChat modules ({e}).")
+        print("Ensure you have set GEOCHAT_REPO_PATH or installed the geochat package locally.")
+        return
+
+    model_id = os.getenv("GEOCHAT_MODEL_ID", "MBZUAI/geochat-7B")
+    
+    print(f"\nAttempting to load {model_id} in 4-bit mode using official loader...")
+    print("This will download the weights if not cached and consume VRAM.")
+
+    try:
+        disable_torch_init()
+
+        # Load the model using the official loader
+        tokenizer, model, image_processor, context_len = load_pretrained_model(
+            model_path=model_id,
+            model_base=None,
+            model_name=model_id.split("/")[-1],
+            load_8bit=False,
+            load_4bit=True,
+            device_map="auto"
         )
         print("\n[SUCCESS] Model loaded successfully into VRAM.")
         
@@ -67,6 +75,7 @@ def run_real_memory_test():
         # Cleanup
         del model
         del tokenizer
+        del image_processor
         gc.collect()
         torch.cuda.empty_cache()
         print("VRAM cleared.")

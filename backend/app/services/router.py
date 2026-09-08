@@ -61,8 +61,8 @@ class ResultIntegrator:
             parameters={"query": query}
         )
         
-        # Ensure confidence is clearly marked as demo/mock
-        confidence = inference_result.get("confidence", 0.0)
+        # Ensure confidence is clearly marked as demo/mock or None
+        confidence = inference_result.get("confidence", None)
         answer = inference_result.get("answer", "")
         evidence = inference_result.get("evidence", [])
         

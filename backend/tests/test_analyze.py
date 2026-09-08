@@ -46,6 +46,14 @@ def test_analyze_single_vqa():
     stages = [s["stage"] for s in data["data"]["executionTrace"]["stages"]]
     assert "request_received" in stages
     assert "input_validated" in stages
+    assert "task_selected" in stages
+    assert "model_selected" in stages
+    assert "inference_started" in stages
+    assert "inference_completed" in stages
+    assert "result_generated" in stages
+    
+    # Verify confidence is None for generative VQA
+    assert data["data"]["confidence"] is None
 
 def test_analyze_bi_temporal():
     response = client.post(
@@ -100,3 +108,14 @@ def test_analyze_invalid_file_extension():
     assert data["success"] is False
     assert data["error"]["code"] == "INVALID_INPUT"
     assert "Unsupported format" in data["error"]["message"]
+
+def test_geochat_local_gpu_no_cuda():
+    import os
+    from unittest import mock
+    from app.models.adapters.geochat_adapter import GeoChatAdapter
+    
+    with mock.patch.dict(os.environ, {"ML_INFERENCE_MODE": "local_gpu"}):
+        adapter = GeoChatAdapter()
+        # Since CUDA is not available on this CPU machine, it should gracefully raise RuntimeError
+        with pytest.raises(RuntimeError, match="CUDA is not available"):
+            adapter.run(query="test", image_path="dummy.png")
