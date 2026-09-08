@@ -85,6 +85,7 @@ def test_analyze_optical_sar():
     assert data["success"] is True
     assert data["data"]["task"] == "optical_sar_analysis"
     assert data["data"]["executionTrace"]["selectedTools"][0]["id"] == "croma"
+    assert data["data"]["confidence"] is None
 
 def test_analyze_missing_image_b():
     response = client.post(
@@ -129,5 +130,15 @@ def test_bitcd_local_gpu_no_cuda():
     with mock.patch.dict(os.environ, {"ML_INFERENCE_MODE": "local_gpu"}):
         adapter = BITCDAdapter()
         # Since CUDA is not available on this CPU machine, it should gracefully raise RuntimeError
+        with pytest.raises(RuntimeError, match="CUDA is not available"):
+            adapter.run(query="test", image_path="dummy.png", image_b_path="dummy2.png")
+
+def test_croma_local_gpu_no_cuda():
+    import os
+    from unittest import mock
+    from app.models.adapters.croma_adapter import CROMAAdapter
+    
+    with mock.patch.dict(os.environ, {"ML_INFERENCE_MODE": "local_gpu"}):
+        adapter = CROMAAdapter()
         with pytest.raises(RuntimeError, match="CUDA is not available"):
             adapter.run(query="test", image_path="dummy.png", image_b_path="dummy2.png")
