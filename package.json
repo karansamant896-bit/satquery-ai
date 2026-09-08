@@ -2,7 +2,10 @@
   "dependencies": {
     "@prisma/client": "^7.10.0",
     "@prisma/orm-postgres": "^8.0.0-rc.8",
-    "dotenv": "^17.4.2"
+    "@supabase/supabase-js": "^2.116.0",
+    "dotenv": "^17.4.2",
+    "server-only": "^0.0.1",
+    "temporal-polyfill": "^1.0.4"
   },
   "scripts": {
     "postinstall": "prisma skills sync || exit 0",
