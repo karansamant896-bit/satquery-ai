@@ -9,3 +9,11 @@ __pycache__/
 .claude/
 .cursor/
 .devin/
+
+# Local ML environments and model repositories
+.venv-croma/
+.venv-geochat/
+.agents-local-backup/
+GeoChat/
+BIT_CD/
+backend/models/
