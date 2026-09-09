@@ -1,0 +1,84 @@
+// use prisma-next
+model User {
+  id        String     @id @default(uuid())
+  email     String     @unique
+  createdAt DateTime   @default(now())
+  analyses  Analysis[]
+}
+
+model Analysis {
+  id             String          @id @default(uuid())
+  status         String
+  inputMode      String
+  queryText      String
+  detectedTask   String?
+  answerText     String?
+  confidence     Float?
+  reportUrl      String?
+  errorCode      String?
+  errorMessage   String?
+  createdAt      DateTime        @default(now())
+  completedAt    DateTime?
+
+  userId         String?
+  user           User?           @relation(fields:[userId], references:[id])
+
+  images         InputImage[]
+  executionSteps ExecutionStep[]
+  evidence       Evidence[]
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+model InputImage {
+  id               String    @id @default(uuid())
+  analysisId       String
+  role             String
+  storagePath      String
+  originalFileName String
+  mimeType         String
+  width            Int?
+  height           Int?
+  bands            Int?
+  acquisitionDate  DateTime?
+  crs              String?
+  metadataJson     Json?
+
+  analysis         Analysis  @relation(fields:[analysisId], references:[id], onDelete: Cascade)
+
+  @@index([analysisId])
+}
+
+model ExecutionStep {
+  id                String    @id @default(uuid())
+  analysisId        String
+  toolId            String
+  stage             String
+  status            String
+  parametersJson    Json?
+  outputSummaryJson Json?
+  confidence        Float?
+  startedAt         DateTime  @default(now())
+  completedAt       DateTime?
+  errorMessage      String?
+
+  analysis          Analysis  @relation(fields:[analysisId], references:[id], onDelete: Cascade)
+
+  @@index([analysisId])
+}
+
+model Evidence {
+  id           String   @id @default(uuid())
+  analysisId   String
+  type         String
+  label        String
+  storagePath  String?
+  score        Float?
+  geometryJson Json?
+  metadataJson Json?
+
+  analysis     Analysis @relation(fields:[analysisId], references:[id], onDelete: Cascade)
+
+  @@index([analysisId])
+}

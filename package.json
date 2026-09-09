@@ -1,0 +1,22 @@
+{
+  "dependencies": {
+    "@prisma/client": "^7.10.0",
+    "@prisma/orm-postgres": "^8.0.0-rc.8",
+    "@supabase/supabase-js": "^2.116.0",
+    "dotenv": "^17.4.2",
+    "server-only": "^0.0.1",
+    "temporal-polyfill": "^1.0.4"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "test": "node --experimental-strip-types --test tests/**/*.test.ts",
+    "postinstall": "prisma skills sync || exit 0",
+    "contract:emit": "prisma contract emit"
+  },
+  "type": "module",
+  "devDependencies": {
+    "@prisma/cli-engine": "^0.2.3",
+    "@types/node": "^26.5.0",
+    "prisma": "^8.0.0-rc.10"
+  }
+}

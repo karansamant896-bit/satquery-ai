@@ -1,0 +1,19 @@
+node_modules/
+.next/
+out/
+.env*
+!.env.example
+npm-debug.log*
+__pycache__/
+*.tsbuildinfo
+.claude/
+.cursor/
+.devin/
+
+# Local ML environments and model repositories
+.venv-croma/
+.venv-geochat/
+.agents-local-backup/
+GeoChat/
+BIT_CD/
+backend/models/
