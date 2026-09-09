@@ -17,7 +17,12 @@ __pycache__/
 *.pfx
 uploads/
 reports/
-models/
+/models/
+/backend/models/
+!backend/app/models/
+!backend/app/models/**
+backend/app/models/**/__pycache__/
+backend/app/models/**/*.pyc
 *.pt
 *.pth
 *.safetensors
@@ -30,3 +35,4 @@ Thumbs.db
 .devin/
 *.log
 coverage/
+*.tsbuildinfo
