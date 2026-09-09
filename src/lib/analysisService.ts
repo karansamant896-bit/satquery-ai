@@ -1,3 +1,8 @@
+if (typeof window !== 'undefined') {
+  throw new Error('src/lib/analysisService.ts cannot be imported from browser/client code.');
+}
+
+import 'temporal-polyfill/full/global';
 import { randomUUID } from 'node:crypto';
 import { db } from '../prisma/db.ts';
 
@@ -73,6 +78,65 @@ export interface IPersistenceStore {
 }
 
 /**
+ * Convert Date | string | Temporal.Instant to Temporal.Instant for Prisma 8 timestamptz codec.
+ */
+export function toTemporalInstant(val: Date | string | Temporal.Instant | null | undefined): Temporal.Instant | null | undefined {
+  if (val === null || val === undefined) return val;
+  if (typeof (val as any).toTemporalInstant === 'function') {
+    return (val as any).toTemporalInstant();
+  }
+  if (val instanceof Date) {
+    return Temporal.Instant.fromEpochMilliseconds(val.getTime());
+  }
+  if (typeof val === 'string') {
+    return Temporal.Instant.from(val);
+  }
+  return val as Temporal.Instant;
+}
+
+/**
+ * Convert Temporal.Instant | string | Date returned by Prisma to JavaScript Date for domain models.
+ */
+export function toJsDate(val: any): Date | null | undefined {
+  if (val === null || val === undefined) return val;
+  if (val instanceof Date) return val;
+  if (typeof val?.epochMilliseconds === 'number') {
+    return new Date(val.epochMilliseconds);
+  }
+  if (typeof val?.toString === 'function') {
+    const d = new Date(val.toString());
+    if (!isNaN(d.getTime())) return d;
+  }
+  return new Date(val);
+}
+
+function mapAnalysisRecord(row: any): AnalysisRecord {
+  if (!row) return row;
+  return {
+    ...row,
+    createdAt: toJsDate(row.createdAt) || new Date(),
+    completedAt: toJsDate(row.completedAt) ?? null,
+  };
+}
+
+function mapInputImageRecord(row: any): InputImageRecord {
+  if (!row) return row;
+  return {
+    ...row,
+    acquisitionDate: toJsDate(row.acquisitionDate) ?? null,
+  };
+}
+
+function mapExecutionStepRecord(row: any): ExecutionStepRecord {
+  if (!row) return row;
+  return {
+    ...row,
+    startedAt: toJsDate(row.startedAt) || new Date(),
+    completedAt: toJsDate(row.completedAt) ?? null,
+  };
+}
+
+/**
  * PrismaStore: Production persistence store using Prisma ORM Postgres runtime.
  */
 export class PrismaStore implements IPersistenceStore {
@@ -83,9 +147,10 @@ export class PrismaStore implements IPersistenceStore {
       inputMode: data.inputMode,
       queryText: data.queryText,
       userId: data.userId || null,
-      createdAt: data.createdAt || new Date(),
+      createdAt: toTemporalInstant(data.createdAt || new Date())!,
     };
-    return (await db.orm.public.Analysis.create(record)) as AnalysisRecord;
+    const created = await db.orm.public.Analysis.create(record as any);
+    return mapAnalysisRecord(created);
   }
 
   async updateAnalysis(id: string, data: Partial<AnalysisRecord>): Promise<AnalysisRecord> {
@@ -97,34 +162,49 @@ export class PrismaStore implements IPersistenceStore {
     if (data.reportUrl !== undefined) updateData.reportUrl = data.reportUrl;
     if (data.errorCode !== undefined) updateData.errorCode = data.errorCode;
     if (data.errorMessage !== undefined) updateData.errorMessage = data.errorMessage;
-    if (data.completedAt !== undefined) updateData.completedAt = data.completedAt;
+    if (data.completedAt !== undefined) updateData.completedAt = toTemporalInstant(data.completedAt);
 
     await db.orm.public.Analysis.where({ id }).update(updateData);
-    return (await db.orm.public.Analysis.first({ id })) as AnalysisRecord;
+    const updated = await db.orm.public.Analysis.first({ id });
+    return mapAnalysisRecord(updated);
   }
 
   async getAnalysis(id: string): Promise<AnalysisRecord | null> {
-    return (await db.orm.public.Analysis.first({ id })) as AnalysisRecord | null;
+    const row = await db.orm.public.Analysis.first({ id });
+    return row ? mapAnalysisRecord(row) : null;
   }
 
   async createInputImage(data: InputImageRecord): Promise<InputImageRecord> {
-    return (await db.orm.public.InputImage.create(data)) as InputImageRecord;
+    const record = {
+      ...data,
+      acquisitionDate: toTemporalInstant(data.acquisitionDate) ?? null,
+    };
+    const created = await db.orm.public.InputImage.create(record as any);
+    return mapInputImageRecord(created);
   }
 
   async listInputImages(analysisId: string): Promise<InputImageRecord[]> {
-    return (await db.orm.public.InputImage.where({ analysisId }).all()) as InputImageRecord[];
+    const rows = await db.orm.public.InputImage.where({ analysisId }).all();
+    return rows.map(mapInputImageRecord);
   }
 
   async createExecutionStep(data: ExecutionStepRecord): Promise<ExecutionStepRecord> {
-    return (await db.orm.public.ExecutionStep.create(data)) as ExecutionStepRecord;
+    const record = {
+      ...data,
+      startedAt: toTemporalInstant(data.startedAt || new Date())!,
+      completedAt: toTemporalInstant(data.completedAt) ?? null,
+    };
+    const created = await db.orm.public.ExecutionStep.create(record as any);
+    return mapExecutionStepRecord(created);
   }
 
   async listExecutionSteps(analysisId: string): Promise<ExecutionStepRecord[]> {
-    return (await db.orm.public.ExecutionStep.where({ analysisId }).all()) as ExecutionStepRecord[];
+    const rows = await db.orm.public.ExecutionStep.where({ analysisId }).all();
+    return rows.map(mapExecutionStepRecord);
   }
 
   async createEvidence(data: EvidenceRecord): Promise<EvidenceRecord> {
-    return (await db.orm.public.Evidence.create(data)) as EvidenceRecord;
+    return (await db.orm.public.Evidence.create(data as any)) as EvidenceRecord;
   }
 
   async listEvidence(analysisId: string): Promise<EvidenceRecord[]> {
